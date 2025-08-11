@@ -30,9 +30,9 @@ function calcularHorasUteis(inicioISO: string, fimISO: string) {
       continue;
     }
     // Calcula o próximo limite de contagem (fim do expediente ou fim do período)
-    let fimExpediente = new Date(atual);
-    fimExpediente.setHours(18, 0, 0, 0);
-    let proximo = fim < fimExpediente ? fim : fimExpediente;
+  const fimExpediente = new Date(atual);
+  fimExpediente.setHours(18, 0, 0, 0);
+  const proximo = fim < fimExpediente ? fim : fimExpediente;
     // Soma apenas se estiver dentro do intervalo permitido
     if (atual < proximo) {
       total += (proximo.getTime() - atual.getTime()) / 36e5;
@@ -120,11 +120,11 @@ export default function DashboardPage() {
 
   // ===== NUNCA condicione hooks. Use defaults quando 'dados' for null. =====
   // Aplica filtro de cidade e data
-  const todasNotas = [
+  const todasNotas = useMemo(() => [
     ...(dados?.entregue ?? []),
     ...(dados?.emRota ?? []),
     ...(dados?.pendente ?? [])
-  ];
+  ], [dados]);
   const cidadesUnicas = useMemo(() => {
     const set = new Set<string>();
     todasNotas.forEach(n => {
@@ -140,8 +140,8 @@ export default function DashboardPage() {
     if (!dataInicio && !dataFim) return notas;
     return notas.filter(n => {
       const data = new Date(n.data_emissao);
-      let inicio = dataInicio ? new Date(dataInicio + 'T00:00:00') : null;
-      let fim = dataFim ? new Date(dataFim + 'T23:59:59') : null;
+  const inicio = dataInicio ? new Date(dataInicio + 'T00:00:00') : null;
+  const fim = dataFim ? new Date(dataFim + 'T23:59:59') : null;
       if (inicio && data < inicio) return false;
       if (fim && data > fim) return false;
       return true;
@@ -183,7 +183,7 @@ export default function DashboardPage() {
       else acima++;
     }
     return { dentro, vencendo, acima, entregues: entregues.length };
-  }, [abertas, entregues.length]);
+  }, [abertas, entregues.length, bucketNota]);
 
   const prioridadeBucket: Record<Bucket, number> = { acima: 0, vencendo: 1, dentro: 2 };
   const notasOrdenadas = useMemo(() => {
@@ -193,7 +193,7 @@ export default function DashboardPage() {
       if (pa !== pb) return pa - pb;
       return new Date(a.data_emissao).getTime() - new Date(b.data_emissao).getTime();
     });
-  }, [abertas]);
+  }, [abertas, bucketNota, prioridadeBucket]);
 
   return (
     <main className="min-h-screen w-full bg-[#0a1833] text-slate-100 flex flex-col">
