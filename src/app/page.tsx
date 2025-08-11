@@ -1,5 +1,54 @@
 "use client";
+// Função para calcular horas úteis (segunda a sexta, 8h às 18h)
+function calcularHorasUteis(inicioISO: string, fimISO: string) {
+  const inicio = new Date(inicioISO);
+  const fim = new Date(fimISO);
+  if (fim <= inicio) return 0;
+  let total = 0;
+  let atual = new Date(inicio);
+  while (atual < fim) {
+    const diaSemana = atual.getDay(); // 0=Dom, 1=Seg, ..., 6=Sab
+    // Se for sábado (6) ou domingo (0), pula para segunda 8h
+    if (diaSemana === 6) {
+      atual.setDate(atual.getDate() + 2);
+      atual.setHours(8, 0, 0, 0);
+      continue;
+    }
+    if (diaSemana === 0) {
+      atual.setDate(atual.getDate() + 1);
+      atual.setHours(8, 0, 0, 0);
+      continue;
+    }
+    // Se antes de segunda 8h, pula para segunda 8h
+    if (diaSemana === 1 && atual.getHours() < 8) {
+      atual.setHours(8, 0, 0, 0);
+    }
+    // Se depois de sexta 18h, pula para próxima segunda 8h
+    if (diaSemana === 5 && atual.getHours() >= 18) {
+      atual.setDate(atual.getDate() + 3);
+      atual.setHours(8, 0, 0, 0);
+      continue;
+    }
+    // Calcula o próximo limite de contagem (fim do expediente ou fim do período)
+    let fimExpediente = new Date(atual);
+    fimExpediente.setHours(18, 0, 0, 0);
+    let proximo = fim < fimExpediente ? fim : fimExpediente;
+    // Soma apenas se estiver dentro do intervalo permitido
+    if (atual < proximo) {
+      total += (proximo.getTime() - atual.getTime()) / 36e5;
+    }
+    // Avança para o próximo ponto de contagem
+    atual = new Date(proximo);
+    if (atual.getHours() >= 18) {
+      atual.setDate(atual.getDate() + 1);
+      atual.setHours(8, 0, 0, 0);
+    }
+  }
+  return total;
+}
 import { useState, useEffect, useMemo } from "react";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { FixedSizeList as List } from "react-window";
 
 // Agora a API pode trazer data_entrega e tempo_h (opcional)
 type Nota = {
@@ -10,12 +59,18 @@ type Nota = {
   data_entrega?: string|null; // ISO opcional
   tempo_h?: number|null;      // opcional (calculado no backend)
   cidade?: string;            // nova coluna
+  transportadora?: string;    // nova coluna
 };
 
 type CardColor = "green" | "yellow" | "red" | "blue";
 type Bucket = "dentro" | "vencendo" | "acima";
 
 export default function DashboardPage() {
+  // Filtros de cidade e data
+  const [visualizacao, setVisualizacao] = useState<'todos' | 'entregues' | 'dentro' | 'vencendo' | 'acima'>('todos');
+  const [cidadeFiltro, setCidadeFiltro] = useState<string>('TODAS');
+  const [dataInicio, setDataInicio] = useState<string>('');
+  const [dataFim, setDataFim] = useState<string>('');
   const [dados, setDados] = useState<{
     entregue: Nota[];
     emRota: Nota[];
@@ -33,15 +88,11 @@ export default function DashboardPage() {
           setDados({ entregue: [], emRota: [], pendente: [] });
           return;
         }
-        // Filtrar apenas cidades desejadas
-        const cidadesPermitidas = ["GOIANIA", "APARECIDA DE GOIANIA"];
-        const notasFiltradas = notas.filter(nota =>
-          nota.cidade && cidadesPermitidas.includes(nota.cidade.toUpperCase())
-        );
+        // Separar por status, sem filtrar cidade ainda
         const entregue: Nota[] = [];
         const emRota: Nota[] = [];
         const pendente: Nota[] = [];
-        for (const nota of notasFiltradas) {
+        for (const nota of notas) {
           switch (nota.status) {
             case "Entregue":
               entregue.push(nota);
@@ -68,14 +119,43 @@ export default function DashboardPage() {
   }, []);
 
   // ===== NUNCA condicione hooks. Use defaults quando 'dados' for null. =====
-  const entregues = dados?.entregue ?? [];
-  const emRota = dados?.emRota ?? [];
-  const pendente = dados?.pendente ?? [];
+  // Aplica filtro de cidade e data
+  const todasNotas = [
+    ...(dados?.entregue ?? []),
+    ...(dados?.emRota ?? []),
+    ...(dados?.pendente ?? [])
+  ];
+  const cidadesUnicas = useMemo(() => {
+    const set = new Set<string>();
+    todasNotas.forEach(n => {
+      if (n.cidade) set.add(n.cidade);
+    });
+    return Array.from(set);
+  }, [todasNotas]);
+
+  const filtrarPorCidade = (notas: Nota[]) =>
+    cidadeFiltro === 'TODAS' ? notas : notas.filter(n => n.cidade === cidadeFiltro);
+
+  const filtrarPorData = (notas: Nota[]) => {
+    if (!dataInicio && !dataFim) return notas;
+    return notas.filter(n => {
+      const data = new Date(n.data_emissao);
+      let inicio = dataInicio ? new Date(dataInicio + 'T00:00:00') : null;
+      let fim = dataFim ? new Date(dataFim + 'T23:59:59') : null;
+      if (inicio && data < inicio) return false;
+      if (fim && data > fim) return false;
+      return true;
+    });
+  };
+
+  const entregues = filtrarPorData(filtrarPorCidade(dados?.entregue ?? []));
+  const emRota = filtrarPorData(filtrarPorCidade(dados?.emRota ?? []));
+  const pendente = filtrarPorData(filtrarPorCidade(dados?.pendente ?? []));
   const abertas = useMemo(() => [...emRota, ...pendente], [emRota, pendente]);
 
   const agoraISO = new Date().toISOString();
   const diffHoras = (inicioISO: string, fimISO: string) =>
-    (new Date(fimISO).getTime() - new Date(inicioISO).getTime()) / 36e5;
+    calcularHorasUteis(inicioISO, fimISO);
 
   const horasNota = (n: Nota) => {
     if (n.status === "Entregue") {
@@ -122,8 +202,54 @@ export default function DashboardPage() {
           <svg width="36" height="36" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#2563eb" /><path d="M7 13l3 3 7-7" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
           Dashboard de Entregas
         </h1>
-  <span className="text-sm text-slate-400 font-medium">Atualizado em {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <span className="text-sm text-slate-400 font-medium">Atualizado em {new Date().toLocaleDateString()} {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
       </header>
+      <section className="flex flex-col md:flex-row gap-4 px-6 mb-6">
+        <div className="flex flex-row gap-2 mb-2 items-end">
+          <button
+            className="px-3 h-9 rounded bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 transition flex items-center"
+            onClick={() => {
+              setCidadeFiltro('TODAS');
+              setDataInicio('');
+              setDataFim('');
+              setVisualizacao('todos');
+            }}
+          >
+            Limpar filtros
+          </button>
+          <div>
+            <label className="block text-xs mb-1 text-slate-400">Cidade</label>
+            <Select value={cidadeFiltro} onValueChange={setCidadeFiltro}>
+              <SelectTrigger className="p-2 rounded bg-[#1e2a4a] text-slate-200 w-56 border-none hover:cursor-pointer">
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2a4a] text-slate-200">
+                <SelectItem value="TODAS">Todas</SelectItem>
+                <List
+                  height={200}
+                  itemCount={cidadesUnicas.length}
+                  itemSize={36}
+                  width={220}
+                >
+                  {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                    <div style={style}>
+                      <SelectItem key={cidadesUnicas[index]} value={cidadesUnicas[index]} className="hover:cursor-pointer">{cidadesUnicas[index]}</SelectItem>
+                    </div>
+                  )}
+                </List>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <label className="block text-xs mb-1 text-slate-400">Data início</label>
+            <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer" />
+          </div>
+          <div>
+            <label className="block text-xs mb-1 text-slate-400">Data fim</label>
+            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer" />
+          </div>
+        </div>
+      </section>
 
       {/* Loader não muda a ordem dos hooks */}
       {aguardando ? (
@@ -137,10 +263,20 @@ export default function DashboardPage() {
           <section className="px-6">
             <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo (SLA) - Dados dos últimos 7 dias</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card titulo="Entregues" cor="blue" total={contadores.entregues} />
-              <Card titulo="Dentro do prazo (≤ 24h)" cor="green" total={contadores.dentro} />
-              <Card titulo="Prazo vencendo (≤ 48h)" cor="yellow" total={contadores.vencendo} />
-              <Card titulo="Fora do prazo (> 48h)" cor="red" total={contadores.acima} />
+              <Card titulo="Entregues" cor="blue" total={contadores.entregues} onClick={() => setVisualizacao('entregues')} isActive={visualizacao === 'entregues'} />
+              <Card titulo="Dentro do prazo (≤ 24h)" cor="green" total={contadores.dentro} onClick={() => setVisualizacao('dentro')} isActive={visualizacao === 'dentro'} />
+              <Card titulo="Prazo vencendo (≤ 48h)" cor="yellow" total={contadores.vencendo} onClick={() => setVisualizacao('vencendo')} isActive={visualizacao === 'vencendo'} />
+              <Card titulo="Fora do prazo (> 48h)" cor="red" total={contadores.acima} onClick={() => setVisualizacao('acima')} isActive={visualizacao === 'acima'} />
+            </div>
+            <div className="mt-2">
+              {visualizacao !== 'todos' && (
+                <button
+                  className="px-3 py-1 rounded bg-slate-700 text-blue-200 text-xs font-semibold hover:bg-slate-800 transition hover:cursor-pointer"
+                  onClick={() => setVisualizacao('todos')}
+                >
+                  Mostrar todas as notas
+                </button>
+              )}
             </div>
           </section>
 
@@ -151,7 +287,13 @@ export default function DashboardPage() {
               Notas Fiscais (Mais antigas para mais novas)
             </h2>
             <TabelaNotas
-              notas={notasOrdenadas}
+              notas={
+                visualizacao === 'entregues' ? entregues :
+                visualizacao === 'dentro' ? abertas.filter(n => bucketNota(n) === 'dentro') :
+                visualizacao === 'vencendo' ? abertas.filter(n => bucketNota(n) === 'vencendo') :
+                visualizacao === 'acima' ? abertas.filter(n => bucketNota(n) === 'acima') :
+                notasOrdenadas
+              }
               bucketNota={bucketNota}
             />
           </section>
@@ -161,7 +303,7 @@ export default function DashboardPage() {
   );
 }
 
-function Card({ titulo, cor, total }: { titulo: string; cor: CardColor; total: number }) {
+function Card({ titulo, cor, total, onClick, isActive }: { titulo: string; cor: CardColor; total: number; onClick?: () => void; isActive?: boolean }) {
   const styleMap = {
     blue: {
       bg: "bg-blue-900/30 border-blue-500",
@@ -195,7 +337,13 @@ function Card({ titulo, cor, total }: { titulo: string; cor: CardColor; total: n
   const styles = styleMap[cor];
 
   return (
-    <div className={`flex flex-col items-start justify-center gap-2 p-6 rounded-2xl border-2 shadow-md transition hover:scale-[1.03] ${styles.bg}`}>
+    <div
+      className={`flex flex-col items-start justify-center gap-2 p-6 rounded-2xl border-2 shadow-md transition hover:scale-[1.03] cursor-pointer ${styles.bg} ${isActive ? 'ring-2 ring-blue-400' : ''}`}
+      onClick={onClick}
+      tabIndex={0}
+      role="button"
+      aria-pressed={isActive}
+    >
       <div className="flex flex-row items-center gap-3 mb-1">
         <span>{styles.icon}</span>
         <span className={`text-base font-semibold ${styles.text}`}>{titulo}</span>
@@ -226,6 +374,7 @@ function TabelaNotas({
             <th className="p-3 font-semibold">Número NF</th>
             <th className="p-3 font-semibold">Cliente</th>
             <th className="p-3 font-semibold">Cidade</th>
+            <th className="p-3 font-semibold">Transportadora</th>
             <th className="p-3 font-semibold">Tempo</th>
             <th className="p-3 font-semibold">Status</th>
             <th className="p-3 font-semibold">Data Emissão</th>
@@ -252,6 +401,7 @@ function TabelaNotas({
                   <td className="p-3 font-mono text-xs md:text-sm text-blue-200">{n.numero_nf}</td>
                   <td className="p-3">{n.cliente}</td>
                   <td className="p-3">{n.cidade ?? '-'}</td>
+                  <td className="p-3">{n.transportadora ?? '-'}</td>
                   <td className="p-3">{badge(b)}</td>
                   <td className="p-3 font-bold">{n.status}</td>
                   <td className="p-3">{new Date(n.data_emissao).toLocaleString()}</td>
