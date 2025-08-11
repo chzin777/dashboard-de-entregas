@@ -207,7 +207,7 @@ export default function DashboardPage() {
       <section className="flex flex-col md:flex-row gap-4 px-6 mb-6">
         <div className="flex flex-row gap-2 mb-2 items-end">
           <button
-            className="px-3 h-9 rounded bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 transition flex items-center"
+            className="px-3 h-9 rounded bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 transition flex items-center hover:cursor-pointer"
             onClick={() => {
               setCidadeFiltro('TODAS');
               setDataInicio('');
