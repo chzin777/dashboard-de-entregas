@@ -66,6 +66,7 @@ type CardColor = "green" | "yellow" | "red" | "blue";
 type Bucket = "dentro" | "vencendo" | "acima";
 
 export default function DashboardPage() {
+  // ...existing code...
   // Filtros de cidade e data
   const [visualizacao, setVisualizacao] = useState<Array<'entregues' | 'dentro' | 'vencendo' | 'acima'>>(/* vazio = todos */[]);
   const [cidadeFiltro, setCidadeFiltro] = useState<string>('TODAS');
@@ -152,6 +153,9 @@ export default function DashboardPage() {
   const emRota = filtrarPorData(filtrarPorCidade(dados?.emRota ?? []));
   const pendente = filtrarPorData(filtrarPorCidade(dados?.pendente ?? []));
   const abertas = useMemo(() => [...emRota, ...pendente], [emRota, pendente]);
+
+  // Total de notas filtradas
+  const totalNotas = entregues.length + emRota.length + pendente.length;
 
   const agoraISO = new Date().toISOString();
   const diffHoras = (inicioISO: string, fimISO: string) =>
@@ -274,7 +278,14 @@ export default function DashboardPage() {
           {/* ...existing code... */}
           <section className="px-6">
             <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo (SLA) - Dados dos últimos 7 dias</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+              <Card
+                titulo="Total de Notas"
+                cor="blue"
+                total={totalNotas}
+                // Card de total não é filtrável
+                isActive={false}
+              />
               <Card
                 titulo="Entregues"
                 cor="blue"
