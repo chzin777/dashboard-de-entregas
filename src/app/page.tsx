@@ -248,14 +248,16 @@ export default function DashboardPage() {
           >
             Limpar filtros
           </button>
-          {visualizacao.length > 0 && (
+
+          {/* {visualizacao.length > 0 && (
             <button
               className="px-5 py-2 rounded bg-gradient-to-r  bg-blue-700 text-white text-sm font-bold shadow-lg hover:bg-blue-800 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:cursor-pointer"
               onClick={() => setVisualizacao([])}
             >
               Mostrar todas as notas
             </button>
-          )}
+          )} */}
+          
         </div>
       </section>
 
