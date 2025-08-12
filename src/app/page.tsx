@@ -210,7 +210,9 @@ export default function DashboardPage() {
             <label className="block text-xs mb-1 text-slate-400">Cidade</label>
             <Select value={cidadeFiltro} onValueChange={setCidadeFiltro}>
               <SelectTrigger className="p-2 rounded bg-[#1e2a4a] text-slate-200 w-56 border-none hover:cursor-pointer">
-                <SelectValue placeholder="Todas" />
+                <SelectValue placeholder="Todas">
+                  {cidadeFiltro !== 'TODAS' ? cidadeFiltro : 'Todas'}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent className="bg-[#1e2a4a] text-slate-200">
                 <SelectItem value="TODAS">Todas</SelectItem>
@@ -257,7 +259,7 @@ export default function DashboardPage() {
               Mostrar todas as notas
             </button>
           )} */}
-          
+
         </div>
       </section>
 
