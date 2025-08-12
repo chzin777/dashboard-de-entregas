@@ -60,12 +60,16 @@ type Nota = {
   tempo_h?: number|null;      // opcional (calculado no backend)
   cidade?: string;            // nova coluna
   transportadora?: string;    // nova coluna
+  codcli?: string | number;   // código do cliente
+  codusur?: string | number;  // RCA
 };
 
 type CardColor = "green" | "yellow" | "red" | "blue";
 type Bucket = "dentro" | "vencendo" | "acima";
 
 export default function DashboardPage() {
+  // Filtro de RCA
+  const [rcaFiltro, setRcaFiltro] = useState<string>('TODOS');
   // ...existing code...
   // Filtros de cidade e data
   const [visualizacao, setVisualizacao] = useState<Array<'entregues' | 'dentro' | 'vencendo' | 'acima'>>(/* vazio = todos */[]);
@@ -134,8 +138,19 @@ export default function DashboardPage() {
     return Array.from(set);
   }, [todasNotas]);
 
+  const rcasUnicos = useMemo(() => {
+    const set = new Set<string>();
+    todasNotas.forEach(n => {
+      if (n.codusur) set.add(String(n.codusur));
+    });
+    return Array.from(set);
+  }, [todasNotas]);
+
   const filtrarPorCidade = (notas: Nota[]) =>
     cidadeFiltro === 'TODAS' ? notas : notas.filter(n => n.cidade === cidadeFiltro);
+
+  const filtrarPorRca = (notas: Nota[]) =>
+    rcaFiltro === 'TODOS' ? notas : notas.filter(n => String(n.codusur) === rcaFiltro);
 
   const filtrarPorData = (notas: Nota[]) => {
     if (!dataInicio && !dataFim) return notas;
@@ -149,9 +164,9 @@ export default function DashboardPage() {
     });
   };
 
-  const entregues = filtrarPorData(filtrarPorCidade(dados?.entregue ?? []));
-  const emRota = filtrarPorData(filtrarPorCidade(dados?.emRota ?? []));
-  const pendente = filtrarPorData(filtrarPorCidade(dados?.pendente ?? []));
+  const entregues = filtrarPorData(filtrarPorRca(filtrarPorCidade(dados?.entregue ?? [])));
+  const emRota = filtrarPorData(filtrarPorRca(filtrarPorCidade(dados?.emRota ?? [])));
+  const pendente = filtrarPorData(filtrarPorRca(filtrarPorCidade(dados?.pendente ?? [])));
   const abertas = useMemo(() => [...emRota, ...pendente], [emRota, pendente]);
 
   // Total de notas filtradas
@@ -236,6 +251,31 @@ export default function DashboardPage() {
             </Select>
           </div>
           <div>
+            <label className="block text-xs mb-1 text-slate-400">RCA</label>
+            <Select value={rcaFiltro} onValueChange={setRcaFiltro}>
+              <SelectTrigger className="p-2 rounded bg-[#1e2a4a] text-slate-200 w-56 border-none hover:cursor-pointer">
+                <SelectValue placeholder="Todos">
+                  {rcaFiltro !== 'TODOS' ? rcaFiltro : 'Todos'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-[#1e2a4a] text-slate-200">
+                <SelectItem value="TODOS">Todos</SelectItem>
+                <List
+                  height={200}
+                  itemCount={rcasUnicos.length}
+                  itemSize={36}
+                  width={220}
+                >
+                  {({ index, style }: { index: number; style: React.CSSProperties }) => (
+                    <div style={style}>
+                      <SelectItem key={rcasUnicos[index]} value={rcasUnicos[index]} className="hover:cursor-pointer">{rcasUnicos[index]}</SelectItem>
+                    </div>
+                  )}
+                </List>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <label className="block text-xs mb-1 text-slate-400">Data início</label>
             <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer h-9" />
           </div>
@@ -277,7 +317,7 @@ export default function DashboardPage() {
         <>
           {/* ...existing code... */}
           <section className="px-6">
-            <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo (SLA) - Dados dos últimos 7 dias</h2>
+            <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo - Dados dos últimos 7 dias</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
               <Card
                 titulo="Total de Notas"
@@ -447,6 +487,8 @@ function TabelaNotas({
           <tr>
             <th className="p-3 font-semibold">Número NF</th>
             <th className="p-3 font-semibold">Cliente</th>
+            <th className="p-3 font-semibold">Cód. Cliente</th>
+            <th className="p-3 font-semibold">RCA</th>
             <th className="p-3 font-semibold">Cidade</th>
             <th className="p-3 font-semibold">Transportadora</th>
             <th className="p-3 font-semibold">Tempo</th>
@@ -457,7 +499,7 @@ function TabelaNotas({
         <tbody>
           {notasPaginadas.length === 0 ? (
             <tr>
-              <td colSpan={7} className="p-6 text-center text-slate-500 italic">
+              <td colSpan={9} className="p-6 text-center text-slate-500 italic">
                 Nenhuma nota encontrada.
               </td>
             </tr>
@@ -474,6 +516,8 @@ function TabelaNotas({
                 <tr key={i} className={`border-t border-slate-700 transition ${rowStyle}`}>
                   <td className="p-3 font-mono text-xs md:text-sm text-blue-200">{n.numero_nf}</td>
                   <td className="p-3">{n.cliente}</td>
+                  <td className="p-3">{n.codcli ?? '-'}</td>
+                  <td className="p-3">{n.codusur ?? '-'}</td>
                   <td className="p-3">{n.cidade ?? '-'}</td>
                   <td className="p-3">{n.transportadora ?? '-'}</td>
                   <td className="p-3">{badge(b)}</td>

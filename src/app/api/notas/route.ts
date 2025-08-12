@@ -15,7 +15,7 @@ export async function GET() {
   try {
     const { data, error } = await supabase
       .from('notas_entregas')
-      .select('numero_nf, cliente, status, data_emissao, cidade, transportadora')
+      .select('numero_nf, cliente, status, data_emissao, cidade, transportadora, codcli, codusur')
       .order('data_emissao', { ascending: false });
 
     // Filtrar notas que NÃO contenham 'HEINZ' no nome do cliente
