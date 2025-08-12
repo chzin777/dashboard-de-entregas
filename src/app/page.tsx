@@ -206,17 +206,6 @@ export default function DashboardPage() {
       </header>
       <section className="flex flex-col md:flex-row gap-4 px-6 mb-6">
         <div className="flex flex-row gap-2 mb-2 items-end">
-          <button
-            className="px-3 h-9 rounded bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 transition flex items-center hover:cursor-pointer"
-            onClick={() => {
-              setCidadeFiltro('TODAS');
-              setDataInicio('');
-              setDataFim('');
-              setVisualizacao('todos');
-            }}
-          >
-            Limpar filtros
-          </button>
           <div>
             <label className="block text-xs mb-1 text-slate-400">Cidade</label>
             <Select value={cidadeFiltro} onValueChange={setCidadeFiltro}>
@@ -242,12 +231,31 @@ export default function DashboardPage() {
           </div>
           <div>
             <label className="block text-xs mb-1 text-slate-400">Data início</label>
-            <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer" />
+            <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer h-9" />
           </div>
           <div>
             <label className="block text-xs mb-1 text-slate-400">Data fim</label>
-            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer" />
+            <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="p-2 rounded bg-[#1e2a4a] text-slate-200 hover:cursor-pointer h-9" />
           </div>
+          <button
+            className="px-3 h-9 rounded bg-blue-700 text-white text-xs font-semibold hover:bg-blue-800 transition-all duration-200 hover:scale-105 flex items-center hover:cursor-pointer"
+            onClick={() => {
+              setCidadeFiltro('TODAS');
+              setDataInicio('');
+              setDataFim('');
+              setVisualizacao('todos');
+            }}
+          >
+            Limpar filtros
+          </button>
+          {visualizacao !== 'todos' && (
+            <button
+              className="px-5 py-2 rounded bg-gradient-to-r  bg-blue-700 text-white text-sm font-bold shadow-lg hover:bg-blue-800 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:cursor-pointer"
+              onClick={() => setVisualizacao('todos')}
+            >
+              Mostrar todas as notas
+            </button>
+          )}
         </div>
       </section>
 
@@ -259,7 +267,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {/* Quadro de 4 colunas */}
+          {/* ...existing code... */}
           <section className="px-6">
             <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo (SLA) - Dados dos últimos 7 dias</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -268,20 +276,10 @@ export default function DashboardPage() {
               <Card titulo="Prazo vencendo (≤ 48h)" cor="yellow" total={contadores.vencendo} onClick={() => setVisualizacao('vencendo')} isActive={visualizacao === 'vencendo'} />
               <Card titulo="Fora do prazo (> 48h)" cor="red" total={contadores.acima} onClick={() => setVisualizacao('acima')} isActive={visualizacao === 'acima'} />
             </div>
-            <div className="mt-2">
-              {visualizacao !== 'todos' && (
-                <button
-                  className="px-3 py-1 rounded bg-slate-700 text-blue-200 text-xs font-semibold hover:bg-slate-800 transition hover:cursor-pointer"
-                  onClick={() => setVisualizacao('todos')}
-                >
-                  Mostrar todas as notas
-                </button>
-              )}
-            </div>
           </section>
 
           {/* Tabela de Em rota + Pendentes ordenada por criticidade */}
-          <section className="flex-1 px-6 mt-8">
+          <section className="flex-1 px-6 mt-8 mb-7">
             <h2 className="text-xl font-semibold mb-4 text-blue-200 flex items-center gap-2">
               <svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#f59e42" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
               Notas Fiscais (Mais antigas para mais novas)
@@ -366,6 +364,16 @@ function TabelaNotas({
     return <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300 border border-green-600/40">Dentro ≤ 24h</span>;
   };
 
+  // Paginação
+  const [pagina, setPagina] = useState(1);
+  const porPagina = 15;
+  const totalPaginas = Math.ceil(notas.length / porPagina);
+  const notasPaginadas = notas.slice((pagina - 1) * porPagina, pagina * porPagina);
+
+  useEffect(() => {
+    if (pagina > totalPaginas) setPagina(1);
+  }, [notas.length, totalPaginas]);
+
   return (
     <div className="overflow-x-auto border border-slate-700 rounded-2xl shadow-md bg-[#172447]">
       <table className="min-w-full table-auto text-sm">
@@ -381,14 +389,14 @@ function TabelaNotas({
           </tr>
         </thead>
         <tbody>
-          {notas.length === 0 ? (
+          {notasPaginadas.length === 0 ? (
             <tr>
-              <td colSpan={6} className="p-6 text-center text-slate-500 italic">
+              <td colSpan={7} className="p-6 text-center text-slate-500 italic">
                 Nenhuma nota encontrada.
               </td>
             </tr>
           ) : (
-            notas.map((n, i) => {
+            notasPaginadas.map((n, i) => {
               const b = bucketNota(n);
               const rowStyle =
                 b === "acima"
@@ -411,6 +419,84 @@ function TabelaNotas({
           )}
         </tbody>
       </table>
+      {/* Paginação */}
+      {totalPaginas > 1 && (
+        <div className="flex justify-center items-center gap-2 py-4 flex-wrap">
+          <button
+            className="px-2 py-1 rounded bg-transparent text-white text-xs font-semibold hover:bg-slate-100 hover:text-blue-700 transition"
+            onClick={() => setPagina(1)}
+            disabled={pagina === 1}
+          >&lt; Primeira Página</button>
+          <button
+            className="px-2 py-1 rounded bg-transparent text-white text-xs font-semibold hover:bg-slate-100 hover:text-blue-700 transition"
+            onClick={() => setPagina(p => Math.max(1, p - 1))}
+            disabled={pagina === 1}
+          >&lt; Anterior</button>
+          <div className="flex gap-1 items-center">
+            {/* Lógica para mostrar no máximo 10 números, sempre a primeira e última página visíveis */}
+            {(() => {
+              const maxVisible = 10;
+              let pages = [];
+              if (totalPaginas <= maxVisible) {
+                for (let i = 1; i <= totalPaginas; i++) pages.push(i);
+              } else {
+                const left = Math.max(2, pagina - Math.floor((maxVisible - 2) / 2));
+                const right = Math.min(totalPaginas - 1, left + maxVisible - 3);
+                if (right >= totalPaginas - 1) {
+                  // Ajusta para mostrar últimas páginas
+                  for (let i = totalPaginas - (maxVisible - 2); i < totalPaginas; i++) pages.push(i);
+                } else {
+                  for (let i = left; i <= right; i++) pages.push(i);
+                }
+                pages = [1, ...pages, totalPaginas];
+              }
+              let last = 0;
+              return pages.map((num, idx) => {
+                if (num - last > 1) {
+                  last = num;
+                  return [<span key={"dots-"+num} className="px-1 text-slate-400">...</span>,
+                    <button
+                      key={num}
+                      className={`px-2 py-1 rounded text-xs font-semibold transition-all duration-150 ${
+                        num === pagina
+                          ? 'bg-slate-100 text-blue-700 font-bold shadow border border-slate-300'
+                          : 'bg-transparent text-white hover:bg-slate-100 hover:text-blue-700 border border-transparent'
+                      }`}
+                      onClick={() => setPagina(num)}
+                      disabled={num === pagina}
+                      aria-current={num === pagina ? 'page' : undefined}
+                    >{num}</button>
+                  ];
+                }
+                last = num;
+                return (
+                  <button
+                    key={num}
+                    className={`px-2 py-1 rounded text-xs font-semibold transition-all duration-150 ${
+                      num === pagina
+                        ? 'bg-slate-100 text-blue-700 font-bold shadow border border-slate-300'
+                        : 'bg-transparent text-white hover:bg-slate-100 hover:text-blue-700 border border-transparent'
+                    }`}
+                    onClick={() => setPagina(num)}
+                    disabled={num === pagina}
+                    aria-current={num === pagina ? 'page' : undefined}
+                  >{num}</button>
+                );
+              });
+            })()}
+          </div>
+          <button
+            className="px-2 py-1 rounded bg-transparent text-white text-xs font-semibold hover:bg-slate-100 hover:text-blue-700 transition disabled:opacity-50"
+            onClick={() => setPagina(p => Math.min(totalPaginas, p + 1))}
+            disabled={pagina === totalPaginas}
+          >Próxima &gt;</button>
+          <button
+            className="px-2 py-1 rounded bg-transparent text-white text-xs font-semibold hover:bg-slate-100 hover:text-blue-700 transition disabled:opacity-50"
+            onClick={() => setPagina(totalPaginas)}
+            disabled={pagina === totalPaginas}
+          >Última Página &gt;</button>
+        </div>
+      )}
     </div>
   );
 }
