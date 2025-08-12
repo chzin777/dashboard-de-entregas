@@ -67,7 +67,7 @@ type Bucket = "dentro" | "vencendo" | "acima";
 
 export default function DashboardPage() {
   // Filtros de cidade e data
-  const [visualizacao, setVisualizacao] = useState<'todos' | 'entregues' | 'dentro' | 'vencendo' | 'acima'>('todos');
+  const [visualizacao, setVisualizacao] = useState<Array<'entregues' | 'dentro' | 'vencendo' | 'acima'>>(/* vazio = todos */[]);
   const [cidadeFiltro, setCidadeFiltro] = useState<string>('TODAS');
   const [dataInicio, setDataInicio] = useState<string>('');
   const [dataFim, setDataFim] = useState<string>('');
@@ -243,15 +243,15 @@ export default function DashboardPage() {
               setCidadeFiltro('TODAS');
               setDataInicio('');
               setDataFim('');
-              setVisualizacao('todos');
+              setVisualizacao([]);
             }}
           >
             Limpar filtros
           </button>
-          {visualizacao !== 'todos' && (
+          {visualizacao.length > 0 && (
             <button
               className="px-5 py-2 rounded bg-gradient-to-r  bg-blue-700 text-white text-sm font-bold shadow-lg hover:bg-blue-800 transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-400 hover:cursor-pointer"
-              onClick={() => setVisualizacao('todos')}
+              onClick={() => setVisualizacao([])}
             >
               Mostrar todas as notas
             </button>
@@ -271,10 +271,42 @@ export default function DashboardPage() {
           <section className="px-6">
             <h2 className="text-lg font-semibold text-slate-300 mb-3">Resumo (SLA) - Dados dos últimos 7 dias</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card titulo="Entregues" cor="blue" total={contadores.entregues} onClick={() => setVisualizacao('entregues')} isActive={visualizacao === 'entregues'} />
-              <Card titulo="Dentro do prazo (≤ 24h)" cor="green" total={contadores.dentro} onClick={() => setVisualizacao('dentro')} isActive={visualizacao === 'dentro'} />
-              <Card titulo="Prazo vencendo (≤ 48h)" cor="yellow" total={contadores.vencendo} onClick={() => setVisualizacao('vencendo')} isActive={visualizacao === 'vencendo'} />
-              <Card titulo="Fora do prazo (> 48h)" cor="red" total={contadores.acima} onClick={() => setVisualizacao('acima')} isActive={visualizacao === 'acima'} />
+              <Card
+                titulo="Entregues"
+                cor="blue"
+                total={contadores.entregues}
+                onClick={() => {
+                  setVisualizacao(v => v.includes('entregues') ? v.filter(f => f !== 'entregues') : [...v, 'entregues']);
+                }}
+                isActive={visualizacao.includes('entregues')}
+              />
+              <Card
+                titulo="Dentro do prazo (≤ 24h)"
+                cor="green"
+                total={contadores.dentro}
+                onClick={() => {
+                  setVisualizacao(v => v.includes('dentro') ? v.filter(f => f !== 'dentro') : [...v, 'dentro']);
+                }}
+                isActive={visualizacao.includes('dentro')}
+              />
+              <Card
+                titulo="Prazo vencendo (≤ 48h)"
+                cor="yellow"
+                total={contadores.vencendo}
+                onClick={() => {
+                  setVisualizacao(v => v.includes('vencendo') ? v.filter(f => f !== 'vencendo') : [...v, 'vencendo']);
+                }}
+                isActive={visualizacao.includes('vencendo')}
+              />
+              <Card
+                titulo="Fora do prazo (> 48h)"
+                cor="red"
+                total={contadores.acima}
+                onClick={() => {
+                  setVisualizacao(v => v.includes('acima') ? v.filter(f => f !== 'acima') : [...v, 'acima']);
+                }}
+                isActive={visualizacao.includes('acima')}
+              />
             </div>
           </section>
 
@@ -285,13 +317,27 @@ export default function DashboardPage() {
               Notas Fiscais (Mais antigas para mais novas)
             </h2>
             <TabelaNotas
-              notas={
-                visualizacao === 'entregues' ? entregues :
-                visualizacao === 'dentro' ? abertas.filter(n => bucketNota(n) === 'dentro') :
-                visualizacao === 'vencendo' ? abertas.filter(n => bucketNota(n) === 'vencendo') :
-                visualizacao === 'acima' ? abertas.filter(n => bucketNota(n) === 'acima') :
-                notasOrdenadas
-              }
+              notas={(() => {
+                if (visualizacao.length === 0) return notasOrdenadas;
+                let result: Nota[] = [];
+                if (visualizacao.includes('entregues')) {
+                  result = [...result, ...entregues];
+                }
+                const buckets = visualizacao.filter(v => v !== 'entregues');
+                if (buckets.length > 0) {
+                  result = [
+                    ...result,
+                    ...abertas.filter(n => buckets.includes(bucketNota(n)))
+                  ];
+                }
+                // Remover duplicados (caso nota esteja em mais de um filtro)
+                const seen = new Set<string>();
+                return result.filter(n => {
+                  if (seen.has(n.numero_nf)) return false;
+                  seen.add(n.numero_nf);
+                  return true;
+                });
+              })()}
               bucketNota={bucketNota}
             />
           </section>
@@ -336,11 +382,16 @@ function Card({ titulo, cor, total, onClick, isActive }: { titulo: string; cor: 
 
   return (
     <div
-      className={`flex flex-col items-start justify-center gap-2 p-6 rounded-2xl border-2 shadow-md transition hover:scale-[1.03] cursor-pointer ${styles.bg} ${isActive ? 'ring-2 ring-blue-400' : ''}`}
+      className={`flex flex-col items-start justify-center gap-2 p-6 rounded-2xl shadow-md transition-all duration-200 hover:scale-[1.03] cursor-pointer
+        ${styles.bg}
+        ${isActive ? 'border-4 border-blue-400 bg-opacity-80 shadow-lg scale-[1.04]' : 'border-2'}
+        ${isActive ? 'bg-gradient-to-br from-blue-900/60 via-blue-800/70 to-blue-700/80' : ''}
+      `}
       onClick={onClick}
       tabIndex={0}
       role="button"
       aria-pressed={isActive}
+      style={{ minHeight: 180, boxShadow: isActive ? '0 0 0 4px #2563eb55, 0 4px 24px #2563eb33' : undefined }}
     >
       <div className="flex flex-row items-center gap-3 mb-1">
         <span>{styles.icon}</span>
@@ -359,9 +410,9 @@ function TabelaNotas({
   bucketNota: (n: Nota) => "dentro" | "vencendo" | "acima";
 }) {
   const badge = (b: Bucket) => {
-    if (b === "acima") return <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300 border border-red-600/40">Acima &gt; 48h</span>;
-    if (b === "vencendo") return <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-600/40">Vencendo ≤ 48h</span>;
-    return <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300 border border-green-600/40">Dentro ≤ 24h</span>;
+    if (b === "acima") return <span className="px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-300 border border-red-600/40">Fora do prazo</span>;
+    if (b === "vencendo") return <span className="px-2 py-0.5 text-xs rounded-full bg-yellow-500/20 text-yellow-300 border border-yellow-600/40">Prazo vencendo</span>;
+    return <span className="px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-300 border border-green-600/40">Dentro do prazo</span>;
   };
 
   // Paginação
